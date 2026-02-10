@@ -1,15 +1,18 @@
 const Twilio = require("twilio");
+const { getSecrets } = require("./getSecrets");
 
 let twilioClient;
 
-const getTwilioClient = () => {
+const getTwilioClient = async () => {
     if (twilioClient) {
         return twilioClient;
     }
 
-    const newClient = new Twilio(process.env.API_KEY, process.env.API_SECRET, {
-        accountSid: process.env.ACCOUNT_SID,
-        region: process.env.TWILIO_REGION
+    const secrets = await getSecrets();
+
+    const newClient = new Twilio(secrets.API_KEY, secrets.API_SECRET, {
+        accountSid: secrets.ACCOUNT_SID,
+        region: secrets.TWILIO_REGION
     });
 
     twilioClient = newClient;

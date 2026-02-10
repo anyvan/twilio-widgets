@@ -11,3 +11,11 @@ cypress/videos/
 cypress/screenshots/
 cypress/downloads/
 cypress.env.json
+
+# Terraform
+server/iac/terraform/.terraform/
+server/iac/terraform/.terraform.lock.hcl
+server/iac/terraform/*.tfstate
+server/iac/terraform/*.tfstate.backup
+server/iac/terraform/terraform.tfvars
+server/iac/lambda.zip

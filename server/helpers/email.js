@@ -1,9 +1,19 @@
 const sgMail = require("@sendgrid/mail");
 const axios = require("axios");
+const { getSecrets } = require("./getSecrets");
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+let isInitialized = false;
 
-function createMessage(emailData, files) {
+async function initializeSendGrid() {
+    if (!isInitialized) {
+        const secrets = await getSecrets();
+        sgMail.setApiKey(secrets.SENDGRID_API_KEY);
+        isInitialized = true;
+    }
+}
+
+async function createMessage(emailData, files) {
+    const secrets = await getSecrets();
     const attachmentObjects = files.map((file) => ({
         content: file.file,
         filename: file.filename,
@@ -12,7 +22,7 @@ function createMessage(emailData, files) {
     }));
     return {
         to: emailData.recipientAddress,
-        from: process.env.FROM_EMAIL,
+        from: secrets.FROM_EMAIL,
         subject: emailData.subject,
         html: emailData.text,
         attachments: attachmentObjects
@@ -20,6 +30,8 @@ function createMessage(emailData, files) {
 }
 
 async function sendMessage(emailParams) {
+    await initializeSendGrid();
+    
     const uniqueFilenames = emailParams.uniqueFilenames;
     const getMedia = emailParams.mediaInfo.map((media) => axios.get(media.url, { responseType: "arraybuffer" }));
     const files = await Promise.all(getMedia).then((responses) => {
@@ -37,14 +49,15 @@ async function sendMessage(emailParams) {
     });
 
     try {
-        await sgMail.send(createMessage(emailParams, files));
+        const message = await createMessage(emailParams, files);
+        await sgMail.send(message);
         return { message: `Transcript email sent to: ${emailParams.recipientAddress}` };
     } catch (error) {
         console.error(`Error sending transcript email to: ${emailParams.recipientAddress}`, error);
         if (error.response) {
             console.error(error.response.body);
         }
-        return { message };
+        return { message: error.message };
     }
 }
 

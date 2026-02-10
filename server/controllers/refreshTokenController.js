@@ -1,15 +1,17 @@
 const jwt = require("jsonwebtoken");
 const { TOKEN_TTL_IN_SECONDS } = require("../constants");
 const { createToken } = require("../helpers/createToken");
+ const { getSecrets } = require("../helpers/getSecrets");
 const { logInitialAction, logFinalAction, logInterimAction } = require("../helpers/logs");
 
 const refreshTokenController = async (request, response) => {
     logInitialAction("Refreshing token");
+    const secrets = await getSecrets();
     let providedIdentity;
 
     try {
         const validatedToken = await new Promise((res, rej) =>
-            jwt.verify(request.body.token, process.env.API_SECRET, {}, (err, decoded) => {
+            jwt.verify(request.body.token, secrets.API_SECRET, {}, (err, decoded) => {
                 if (err) return rej(err);
                 return res(decoded);
             })
@@ -22,7 +24,7 @@ const refreshTokenController = async (request, response) => {
 
     logInterimAction("Token is valid for", providedIdentity);
 
-    const refreshedToken = createToken(providedIdentity);
+    const refreshedToken = await createToken(providedIdentity);
 
     response.send({
         token: refreshedToken,
