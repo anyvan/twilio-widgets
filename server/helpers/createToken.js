@@ -1,14 +1,16 @@
 const Twilio = require("twilio");
 const { TOKEN_TTL_IN_SECONDS } = require("../constants");
 const { logInterimAction } = require("./logs");
+const { getSecrets } = require("./getSecrets");
 
-const createToken = (identity) => {
+const createToken = async (identity) => {
     logInterimAction("Creating new token");
+    const secrets = await getSecrets();
     const { AccessToken } = Twilio.jwt;
     const { ChatGrant, TaskRouterGrant } = AccessToken;
 
     const chatGrant = new ChatGrant({
-        serviceSid: process.env.CONVERSATIONS_SERVICE_SID
+        serviceSid: secrets.CONVERSATIONS_SERVICE_SID
     });
 
     const taskRouterGrant = new TaskRouterGrant({

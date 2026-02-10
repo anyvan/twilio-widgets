@@ -108,6 +108,149 @@ jobs:
           target_tag: "<< parameters.additional_tag >>"
 
 
+  build_widget:
+    executor: node-executor
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install widget dependencies
+          command: |
+            corepack enable
+            yarn install --frozen-lockfile
+      - run:
+          name: Build widget
+          command: |
+            export EMAIL_TRANSCRIPT_ENABLED=true
+            export DOWNLOAD_TRANSCRIPT_ENABLED=true
+            yarn build
+      - run:
+          name: Verify widget build
+          command: |
+            ls -la build/static/js/
+            if [ ! -f "build/static/js/main.js" ]; then
+              echo "Error: main.js not found in build/static/js/ directory"
+              exit 1
+            fi
+            echo "Build successful - main.js size:"
+            ls -lh build/static/js/main.js
+      - persist_to_workspace:
+          root: .
+          paths:
+            - build/
+
+  build_server:
+    executor: node-executor
+    steps:
+      - checkout
+      - run:
+          name: Install server dependencies
+          working_directory: ~/project
+          command: |
+            if [ -f "package-lock.json" ]; then
+              npm ci
+            else
+              yarn install --frozen-lockfile
+            fi
+      - run:
+          name: Verify server files
+          working_directory: ~/project/server
+          command: |
+            ls -la
+            if [ ! -f "lambda.js" ]; then
+              echo "Error: lambda.js not found in server directory"
+              exit 1
+            fi
+            echo "Server files ready for deployment"
+      - persist_to_workspace:
+          root: .
+          paths:
+            - server/
+            - node_modules/
+
+  deploy_staging:
+    executor: node-executor
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install AWS CLI
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y awscli
+      - run:
+          name: Deploy to staging S3 bucket
+          command: |
+            export AWS_PROFILE="test1"
+            BUCKET_NAME="staging-assets-anyvan"
+            
+            echo "Deploying twilio-webchat widget to staging..."
+            echo "Bucket: $BUCKET_NAME"
+            
+            if [ ! -f ~/build/static/js/main.js ]; then
+              echo "Error: ~/build/static/js/main.js not found"
+              exit 1
+            fi
+            
+            # Generate hash of the built file
+            FILE_HASH=$(sha256sum ~/build/static/js/main.js | cut -d' ' -f1 | head -c 8)
+            HASHED_FILENAME="twilio-webchat-widget.${FILE_HASH}.js"
+            
+            echo "Hash: $FILE_HASH"
+            echo "Uploading to: /widgets/$HASHED_FILENAME"
+
+            # Upload the widget to S3 with hashed filename (long cache)
+            aws s3 cp ~/build/static/js/main.js s3://$BUCKET_NAME/widgets/$HASHED_FILENAME \
+              --content-type "application/javascript" \
+              --cache-control "public, max-age=31536000" \
+              --metadata-directive REPLACE
+
+            echo "Deployment to staging completed successfully"
+            echo "Widget available at:"
+            echo "  - https://staging-assets.anyvan.com/widgets/$HASHED_FILENAME (1 year cache)"
+
+  deploy_production:
+    executor: node-executor
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Install AWS CLI
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y awscli
+      - run:
+          name: Deploy to production S3 bucket
+          command: |
+            export AWS_PROFILE="production"
+            BUCKET_NAME="prod-assets-anyvan"
+            
+            echo "Deploying twilio-webchat widget to production..."
+            echo "Bucket: $BUCKET_NAME"
+            
+            if [ ! -f ~/build/static/js/main.js ]; then
+              echo "Error: ~/build/static/js/main.js not found"
+              exit 1
+            fi
+            
+            # Generate hash of the built file
+            FILE_HASH=$(sha256sum ~/build/static/js/main.js | cut -d' ' -f1 | head -c 8)
+            HASHED_FILENAME="twilio-webchat-widget.${FILE_HASH}.js"
+            
+            echo "Hash: $FILE_HASH"
+            echo "Uploading to: /widgets/$HASHED_FILENAME"
+            
+            # Upload the widget to S3 with hashed filename (long cache)
+            aws s3 cp ~/build/static/js/main.js s3://$BUCKET_NAME/widgets/$HASHED_FILENAME \
+              --content-type "application/javascript" \
+              --cache-control "public, max-age=31536000" \
+              --metadata-directive REPLACE
+            
+            echo "Deployment to production completed successfully"
+            echo "Widget available at:"
+            echo "  - https://assets.anyvan.com/widgets/$HASHED_FILENAME (1 year cache)"
+
 workflows:
   # Default workflow - Deploy to PR Environment
   deploy_to_pr_env:

@@ -2,6 +2,7 @@ const axios = require("axios");
 const { createToken } = require("../helpers/createToken");
 const { TOKEN_TTL_IN_SECONDS } = require("../constants");
 const { getTwilioClient } = require("../helpers/getTwilioClient");
+const { getSecrets } = require("../helpers/getSecrets");
 const { logFinalAction, logInitialAction, logInterimAction } = require("../helpers/logs");
 const { version } = require('./../../package.json');
 
@@ -66,9 +67,10 @@ const createConversationAndTriggerStudioFlow = async (request, customerFriendlyN
     };
 };
 
-const sendUserMessage = (conversationSid, identity, messageBody) => {
+const sendUserMessage = async (conversationSid, identity, messageBody) => {
     logInterimAction("Sending user message");
-    return getTwilioClient()
+    const client = await getTwilioClient();
+    return client
         .conversations.conversations(conversationSid)
         .messages.create({
             body: messageBody,
@@ -82,9 +84,10 @@ const sendUserMessage = (conversationSid, identity, messageBody) => {
         });
 };
 
-const sendWelcomeMessage = (conversationSid, customerFriendlyName) => {
+const sendWelcomeMessage = async (conversationSid, customerFriendlyName) => {
     logInterimAction("Sending welcome message");
-    return getTwilioClient()
+    const client = await getTwilioClient();
+    return client
         .conversations.conversations(conversationSid)
         .messages.create({
             body: `Welcome! An agent will be with you in just a moment.`,
@@ -118,7 +121,7 @@ const initWebchatController = async (request, response) => {
     }
 
     // Generate token for customer
-    const token = createToken(identity);
+    const token = await createToken(identity);
 
     // OPTIONAL — if user query is defined
     if (request.body?.formData?.query) {

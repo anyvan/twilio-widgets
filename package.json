@@ -13,6 +13,8 @@
     "@twilio-paste/theme": "^5.3.3",
     "@twilio/conversations": "2.1.0-rc.0",
     "@types/file-saver": "2.0.5",
+    "@vendia/serverless-express": "^4.10.4",
+    "aws-sdk": "^2.1691.0",
     "file-saver": "2.0.5",
     "google-auth-library": "8.5.1",
     "googleapis": "107.0.0",

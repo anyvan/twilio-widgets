@@ -308,6 +308,89 @@ Twilio Webchat React App is built using [Twilio Paste Design System](https://pas
 Using Webchat app as a foundation for your website chat widget will make it easier to stay WCAG compliant with your website.
 Find out more about [Twilio UX principles](https://paste.twilio.design/principles) and [inclusive design guidelines](https://paste.twilio.design/inclusive-design).
 
+# AWS Deployment
+
+This project includes a complete AWS deployment setup using CircleCI, Terraform, and S3.
+
+## Architecture
+
+- **Widget**: React app deployed to S3 with CloudFront distribution
+- **Server**: Express server deployed as AWS Lambda with API Gateway
+- **Secrets**: Stored in AWS Secrets Manager
+- **Infrastructure**: Managed with Terraform
+
+## Automated Deployment
+
+The project uses CircleCI for CI/CD:
+
+- **Non-main branches**: Deploy widget and server to staging environment
+- **Main branch**: Deploy widget and server to production environment
+
+### What Gets Deployed
+
+1. **Widget Build**
+   - React app built with `yarn build`
+   - Widget file (`main.js`) uploaded to S3
+   - File is hashed for cache-busting
+   - Available at: `https://[staging-]assets.anyvan.com/widgets/twilio-webchat-widget.{hash}.js`
+
+2. **Server Lambda**
+   - Express server packaged as Lambda function
+   - Deployed via Terraform with API Gateway
+   - Secrets fetched from AWS Secrets Manager
+   - Available at: `https://{api-id}.execute-api.eu-west-1.amazonaws.com/{environment}`
+
+## Manual Deployment
+
+### Prerequisites
+
+1. AWS CLI configured with AnyVan AWS profiles
+2. Terraform 1.8.5 or later
+3. Node.js 14 or later
+
+### Deploy Widget
+
+```bash
+# Build the widget
+yarn install
+yarn build
+
+# Deploy to S3 (staging)
+aws s3 cp build/static/js/main.js s3://staging-assets-anyvan/widgets/twilio-webchat-widget.js \
+  --profile test1 \
+  --content-type "application/javascript"
+
+# Deploy to S3 (production)
+aws s3 cp build/static/js/main.js s3://prod-assets-anyvan/widgets/twilio-webchat-widget.js \
+  --profile production \
+  --content-type "application/javascript"
+```
+
+### Deploy Server
+
+```bash
+# Deploy to staging
+cd server/iac/terraform
+terraform init
+terraform workspace select stage || terraform workspace new stage
+terraform apply -var-file=env/staging.tfvars.json
+
+# Deploy to production
+terraform workspace select production || terraform workspace new production
+terraform apply -var-file=env/production.tfvars.json
+```
+
+See [server/iac/terraform/README.md](server/iac/terraform/README.md) for detailed infrastructure documentation.
+
+## Environment Configuration
+
+The server uses AWS Secrets Manager in Lambda environments:
+
+- **Staging**: `stage-twilio-flex-secret`, `stage-sendgrid-secret`
+- **Production**: `prod-twilio-flex-secret`, `prod-sendgrid-secret`
+
+For local development, use the `.env` file as described in the setup section above.
+
 # FAQs
 
 ### As a developer, how do I clear an ongoing chat?
@@ -318,6 +401,22 @@ Alternatively, you can simply wrap up/complete the corresponding task as an agen
 ### Can I use npm?
 
 Currently there is a known issue with installing dependencies for this project using npm. We are investigating this and will publish a fix as soon as possible. We recommend using `yarn` instead.
+
+### How do I update secrets in AWS Secrets Manager?
+
+```bash
+# Update Twilio secrets (staging)
+aws secretsmanager put-secret-value \
+  --secret-id stage-twilio-flex-secret \
+  --secret-string '{"ACCOUNT_SID":"...","API_KEY":"...","API_SECRET":"...","AUTH_TOKEN":"...","ADDRESS_SID":"...","CONVERSATIONS_SERVICE_SID":"...","TWILIO_REGION":"stage-us1"}' \
+  --profile test1
+
+# Update SendGrid secrets (staging)
+aws secretsmanager put-secret-value \
+  --secret-id stage-sendgrid-secret \
+  --secret-string '{"SENDGRID_API_KEY":"...","FROM_EMAIL":"noreply@example.com"}' \
+  --profile test1
+```
 
 # License
 
